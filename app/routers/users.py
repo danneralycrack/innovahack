@@ -44,3 +44,6 @@ async def get_user(user_id: str, db=Depends(get_database)):
         return user
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener usuario: {str(e)}")
+
+
+#@router.post("/assign-route")

@@ -26,6 +26,7 @@ class RouteResponse(BaseModel):
     id: str = Field(..., alias="_id")
     name: str
     coordinates: List[List[float]]
+    assigned: bool = False
 
     class Config:
         populate_by_name = True

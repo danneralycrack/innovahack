@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.database import connect_to_mongo, close_mongo_connection
-from app.routers import users, routes, websocket_simple
+from app.routers import users, routes, websocket_simple, assignments
 
 app = FastAPI(
     title="Innova Backend API",
@@ -34,6 +34,7 @@ async def shutdown_db_client():
 # Incluir routers
 app.include_router(users.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
+app.include_router(assignments.router, prefix="/api")
 app.include_router(websocket_simple.router)
 
 

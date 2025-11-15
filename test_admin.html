@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Panel de Tracking</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00d9ff;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .connect-btn {
+            background: #00d9ff;
+            color: #1a1a2e;
+        }
+        .disconnect-btn {
+            background: #ff006e;
+            color: white;
+        }
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .connected {
+            background: #00d9ff;
+            color: #1a1a2e;
+        }
+        .disconnected {
+            background: #ff006e;
+            color: white;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #00d9ff;
+        }
+        .stat-label {
+            color: #aaa;
+            margin-top: 5px;
+        }
+        #users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .user-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #00d9ff;
+        }
+        .user-card.offline {
+            opacity: 0.6;
+            border-left-color: #555;
+        }
+        .user-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00d9ff;
+            margin-bottom: 10px;
+        }
+        .user-info {
+            margin: 8px 0;
+            color: #ddd;
+        }
+        .user-location {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .timestamp {
+            color: #00d9ff;
+            font-size: 12px;
+        }
+        #messages {
+            background: #16213e;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            background: #0f3460;
+            border-radius: 5px;
+            border-left: 3px solid #00d9ff;
+        }
+        .message.connected {
+            border-left-color: #00ff88;
+        }
+        .message.disconnected {
+            border-left-color: #ff006e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Panel de Tracking - Admin</h1>
+        
+        <div class="controls">
+            <button class="connect-btn" id="connectBtn" onclick="connectAdmin()">
+                🔌 Conectar como Admin
+            </button>
+            <button class="disconnect-btn" id="disconnectBtn" onclick="disconnectAdmin()" disabled>
+                ❌ Desconectar
+            </button>
+        </div>
+
+        <div id="status" class="status disconnected">
+            ⭕ Desconectado
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="activeUsers">0</div>
+                <div class="stat-label">Recolectores Activos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalUpdates">0</div>
+                <div class="stat-label">Actualizaciones Recibidas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="lastUpdate">--:--:--</div>
+                <div class="stat-label">Última Actualización</div>
+            </div>
+        </div>
+
+        <h2 style="color: #00d9ff;">📍 Ubicaciones en Tiempo Real</h2>
+        <div id="users-grid"></div>
+
+        <h2 style="color: #00d9ff; margin-top: 40px;">📨 Log de Eventos</h2>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let totalUpdates = 0;
+        let activeUsersMap = new Map();
+        const ADMIN_ID = "6918c26392cd6492dbd79516"; // ID de Danner Aly (Admin)
+
+        function connectAdmin() {
+            ws = new WebSocket(`ws://localhost:8000/ws/admin/${ADMIN_ID}`);
+
+            ws.onopen = () => {
+                updateStatus(true);
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                addMessage('✅ Conectado como Admin - Esperando ubicaciones...', 'connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Mensaje recibido:', data);
+                
+                handleMessage(data);
+            };
+
+            ws.onclose = () => {
+                updateStatus(false);
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                addMessage('❌ Desconectado del servidor', 'disconnected');
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addMessage('⚠️ Error en la conexión', 'error');
+            };
+        }
+
+        function disconnectAdmin() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function handleMessage(data) {
+            switch(data.type) {
+                case 'active_users':
+                    // Lista inicial de usuarios activos
+                    addMessage(`📋 ${data.count} recolectores activos`, 'info');
+                    data.users.forEach(user => {
+                        updateUserCard(user);
+                    });
+                    break;
+                
+                case 'location_update':
+                    // Actualización de ubicación en tiempo real
+                    totalUpdates++;
+                    document.getElementById('totalUpdates').textContent = totalUpdates;
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                    
+                    updateUserCard({
+                        user_id: data.user_id,
+                        name: data.name,
+                        lat: data.lat,
+                        lng: data.lng,
+                        route_id: data.route_id,
+                        last_update: data.timestamp
+                    });
+                    
+                    addMessage(`📍 ${data.name}: (${data.lat.toFixed(6)}, ${data.lng.toFixed(6)})`, 'info');
+                    break;
+                
+                case 'user_connected':
+                    addMessage(`🟢 ${data.name} se conectó`, 'connected');
+                    break;
+                
+                case 'user_disconnected':
+                    addMessage(`🔴 ${data.name} se desconectó`, 'disconnected');
+                    removeUserCard(data.user_id);
+                    break;
+            }
+            
+            updateActiveUsersCount();
+        }
+
+        function updateUserCard(user) {
+            activeUsersMap.set(user.user_id, user);
+            
+            const grid = document.getElementById('users-grid');
+            let card = document.getElementById(`user-${user.user_id}`);
+            
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `user-${user.user_id}`;
+                card.className = 'user-card';
+                grid.appendChild(card);
+            }
+            
+            card.innerHTML = `
+                <div class="user-name">${user.name}</div>
+                <div class="user-info">
+                    <strong>ID:</strong> ${user.user_id}
+                </div>
+                ${user.route_id ? `<div class="user-info"><strong>Ruta:</strong> ${user.route_id}</div>` : ''}
+                <div class="user-location">
+                    📍 Lat: ${user.lat.toFixed(6)}<br>
+                    📍 Lng: ${user.lng.toFixed(6)}
+                </div>
+                <div class="timestamp">
+                    🕐 ${new Date(user.last_update).toLocaleTimeString()}
+                </div>
+            `;
+        }
+
+        function removeUserCard(userId) {
+            activeUsersMap.delete(userId);
+            const card = document.getElementById(`user-${userId}`);
+            if (card) {
+                card.remove();
+            }
+        }
+
+        function updateActiveUsersCount() {
+            document.getElementById('activeUsers').textContent = activeUsersMap.size;
+        }
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.textContent = '✅ Conectado - Recibiendo ubicaciones en tiempo real';
+                statusDiv.className = 'status connected';
+            } else {
+                statusDiv.textContent = '⭕ Desconectado';
+                statusDiv.className = 'status disconnected';
+            }
+        }
+
+        function addMessage(text, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${text}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            // Mantener solo los últimos 50 mensajes
+            while (messagesDiv.children.length > 50) {
+                messagesDiv.removeChild(messagesDiv.firstChild);
+            }
+        }
+    </script>
+</body>
+</html>

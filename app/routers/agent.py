@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Depends
 from fastapi.responses import JSONResponse
 from app.schemas.agent import ImageAnalysisRequest, ImageAnalysisResponse
 from app.agents.trash_vision_agent import trash_agent
+from app.config.database import get_database
 from datetime import datetime
 import base64
 
@@ -12,11 +13,12 @@ router = APIRouter(
 
 
 @router.post("/analyze-trash-bin", response_model=ImageAnalysisResponse)
-async def analyze_trash_bin_image(request: ImageAnalysisRequest):
+async def analyze_trash_bin_image(request: ImageAnalysisRequest, db=Depends(get_database)):
     """
     Analizar imagen de carrito de basura con IA (Gemini Vision)
     
     Recibe una imagen en base64 y retorna el porcentaje de llenado.
+    Guarda el resultado en la colección "rutas_completadas".
     
     **Ejemplo de uso:**
     ```python
@@ -40,6 +42,21 @@ async def analyze_trash_bin_image(request: ImageAnalysisRequest):
         # Analizar imagen con el agente
         fill_percentage = trash_agent.analyze_image_base64(request.image_base64)
         
+        print(f"📊 Porcentaje analizado: {fill_percentage}")
+        
+        # Guardar en la colección "rutas_completadas"
+        rutas_completadas_collection = db["rutas_completadas"]
+        nuevo_documento = {
+            "nombre": "Juan Agustin",
+            "foto_base64": request.image_base64,
+            "volumen_porcentual": fill_percentage,
+            "timestamp": datetime.now()
+        }
+        
+        print(f"💾 Intentando guardar en rutas_completadas...")
+        result = await rutas_completadas_collection.insert_one(nuevo_documento)
+        print(f"✅ Documento guardado con ID: {result.inserted_id}")
+        
         return ImageAnalysisResponse(
             fill_percentage=fill_percentage,
             timestamp=datetime.now()
@@ -53,11 +70,12 @@ async def analyze_trash_bin_image(request: ImageAnalysisRequest):
 
 
 @router.post("/analyze-trash-bin-file")
-async def analyze_trash_bin_file(file: UploadFile = File(...)):
+async def analyze_trash_bin_file(file: UploadFile = File(...), db=Depends(get_database)):
     """
     Analizar imagen de carrito de basura subiendo archivo directamente
     
     Acepta formatos: JPG, JPEG, PNG, WEBP
+    Guarda el resultado en la colección "rutas_completadas".
     
     **Ejemplo con curl:**
     ```bash
@@ -78,8 +96,26 @@ async def analyze_trash_bin_file(file: UploadFile = File(...)):
         # Leer bytes de la imagen
         image_bytes = await file.read()
         
+        # Convertir a base64 para guardar en BD
+        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        
         # Analizar con el agente
         fill_percentage = trash_agent.analyze_image(image_bytes)
+        
+        print(f"📊 Porcentaje analizado: {fill_percentage}")
+        
+        # Guardar en la colección "rutas_completadas"
+        rutas_completadas_collection = db["rutas_completadas"]
+        nuevo_documento = {
+            "nombre": "Juan Agustin",
+            "foto_base64": image_base64,
+            "volumen_porcentual": fill_percentage,
+            "timestamp": datetime.now()
+        }
+        
+        print(f"💾 Intentando guardar en rutas_completadas...")
+        result = await rutas_completadas_collection.insert_one(nuevo_documento)
+        print(f"✅ Documento guardado con ID: {result.inserted_id}")
         
         return ImageAnalysisResponse(
             fill_percentage=fill_percentage,

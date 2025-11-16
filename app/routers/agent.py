@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from app.schemas.agent import ImageAnalysisRequest, ImageAnalysisResponse, UpdateRutaCompletadaRequest
 from app.agents.trash_vision_agent import trash_agent
 from app.config.database import get_database
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 import base64
 
@@ -47,12 +47,14 @@ async def analyze_trash_bin_image(request: ImageAnalysisRequest, db=Depends(get_
         
         # Guardar en la colección "rutas_completadas"
         rutas_completadas_collection = db["rutas_completadas"]
+        bolivia_time = datetime.utcnow() - timedelta(hours=4)
+     
         nuevo_documento = {
             "nombre": "Juan Agustin",
             "ruta": "Ruta 5 - UPSA",
             "foto_base64": request.image_base64,
             "volumen_porcentual": fill_percentage,
-            "timestamp": datetime.now()
+            "timestamp": bolivia_time
         }
         
         print(f"💾 Intentando guardar en rutas_completadas...")

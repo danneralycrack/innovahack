@@ -191,7 +191,7 @@
         const ADMIN_ID = "6918c26392cd6492dbd79516"; // ID de Danner Aly (Admin)
 
         function connectAdmin() {
-            ws = new WebSocket(`ws://localhost:8000/ws/admin/${ADMIN_ID}`);
+            ws = new WebSocket(`wss://innovahack.onrender.com/ws/admin/${ADMIN_ID}`);
 
             ws.onopen = () => {
                 updateStatus(true);

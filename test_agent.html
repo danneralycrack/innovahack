@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Agente de Análisis de Basura</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+        }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background: #f0f0ff;
+            border-color: #5568d3;
+        }
+        .upload-area.dragover {
+            background: #e0e7ff;
+            border-color: #4f46e5;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .preview {
+            max-width: 100%;
+            max-height: 400px;
+            margin: 20px 0;
+            border-radius: 10px;
+            display: none;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        .result.vacio {
+            background: #d1fae5;
+            border-left: 5px solid #10b981;
+        }
+        .result.medio {
+            background: #fef3c7;
+            border-left: 5px solid #f59e0b;
+        }
+        .result.lleno {
+            background: #fee2e2;
+            border-left: 5px solid #ef4444;
+        }
+        .result-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .result-detail {
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ Agente de Análisis de Basura</h1>
+        <p style="text-align: center; color: #666;">
+            Sube una imagen de un carrito de basura y la IA analizará su nivel de llenado
+        </p>
+
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <p style="font-size: 48px; margin: 0;">📷</p>
+            <p style="font-size: 18px; margin: 10px 0;">Click para seleccionar imagen</p>
+            <p style="color: #999; font-size: 14px;">o arrastra y suelta aquí</p>
+            <p style="color: #999; font-size: 12px;">Formatos: JPG, PNG, WEBP</p>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+
+        <img id="preview" class="preview" alt="Preview">
+
+        <button id="analyzeBtn" onclick="analyzeImage()" disabled>
+            🤖 Analizar con IA
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analizando imagen con Gemini AI...</p>
+        </div>
+
+        <div class="result" id="result">
+            <div class="result-title" id="resultTitle"></div>
+            <div class="result-detail" id="resultPercentage"></div>
+            <div class="result-detail" id="resultRecommendation"></div>
+            <div class="result-detail" id="resultTimestamp"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        const API_URL = 'http://localhost:8000/api/agent/analyze-trash-bin-file';
+
+        // Drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Por favor selecciona una imagen válida');
+                return;
+            }
+
+            selectedFile = file;
+
+            // Mostrar preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.getElementById('preview');
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // Habilitar botón de análisis
+            document.getElementById('analyzeBtn').disabled = false;
+            document.getElementById('result').style.display = 'none';
+        }
+
+        async function analyzeImage() {
+            if (!selectedFile) {
+                alert('Selecciona una imagen primero');
+                return;
+            }
+
+            // Mostrar loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('analyzeBtn').disabled = true;
+            document.getElementById('result').style.display = 'none';
+
+            try {
+                // Crear FormData
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                // Enviar a la API
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta de la API');
+                }
+
+                const data = await response.json();
+                
+                // Mostrar resultado
+                showResult(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al analizar la imagen. Verifica que el servidor esté corriendo y que hayas configurado GEMINI_API_KEY');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+
+        function showResult(data) {
+            const resultDiv = document.getElementById('result');
+            const { fill_percentage, timestamp } = data;
+
+            // Extraer número del porcentaje
+            const percentageNum = parseInt(fill_percentage);
+            
+            // Determinar clase y configuración según porcentaje
+            let config;
+            if (percentageNum <= 30) {
+                config = { class: 'vacio', emoji: '✅', title: 'Carrito Vacío' };
+            } else if (percentageNum <= 70) {
+                config = { class: 'medio', emoji: '⚠️', title: 'Carrito Medio Lleno' };
+            } else {
+                config = { class: 'lleno', emoji: '🔴', title: 'Carrito Lleno' };
+            }
+
+            // Aplicar clase
+            resultDiv.className = 'result ' + config.class;
+            
+            // Mostrar datos
+            document.getElementById('resultTitle').textContent = `${config.emoji} ${config.title}`;
+            document.getElementById('resultPercentage').innerHTML = `<strong>Nivel de Llenado:</strong> ${fill_percentage}`;
+            document.getElementById('resultRecommendation').innerHTML = `<strong>Análisis:</strong> El contenedor está ${fill_percentage} lleno`;
+            document.getElementById('resultTimestamp').innerHTML = `<strong>Analizado:</strong> ${new Date(timestamp).toLocaleString()}`;
+
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

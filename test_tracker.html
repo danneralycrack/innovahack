@@ -140,7 +140,7 @@
                 return;
             }
 
-            ws = new WebSocket(`ws://localhost:8000/ws/tracker/${userId}`);
+            ws = new WebSocket(`wss://innovahack.onrender.com/ws/tracker/${userId}`);
 
             ws.onopen = () => {
                 updateStatus(true);

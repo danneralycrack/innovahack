@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from typing import List
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from app.config.database import get_database
 from app.schemas.alert import AlertCreate, AlertResponse
+from app.services.connection_manager import manager
 
 router = APIRouter(
     prefix="/alerts",
     tags=["Alerts"]
 )
-
 
 @router.post("/", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert(alert: AlertCreate, db=Depends(get_database)):
@@ -64,7 +64,17 @@ async def create_alert(alert: AlertCreate, db=Depends(get_database)):
         created_alert = await alerts_collection.find_one({"_id": result.inserted_id})
         created_alert["_id"] = str(created_alert["_id"])
         
-        return AlertResponse(**created_alert)
+        # 🔔 Enviar notificación por WebSocket a todos los clientes conectados
+        alert_response = AlertResponse(**created_alert)
+        await manager.broadcast_alert({
+            "_id": created_alert["_id"],
+            "name_user": name_user,
+            "route_name": route_name,
+            "message": "Se desvió de su ruta",
+            "date": bolivia_time.isoformat()
+        })
+        
+        return alert_response
         
     except HTTPException:
         raise
@@ -186,3 +196,33 @@ async def delete_alert(alert_id: str, db=Depends(get_database)):
             status_code=500,
             detail=f"Error al eliminar alerta: {str(e)}"
         )
+
+
+@router.websocket("/ws")
+async def websocket_alerts(websocket: WebSocket):
+    """
+    WebSocket para recibir notificaciones de alertas en tiempo real
+    
+    Uso desde el frontend:
+    ```javascript
+    const ws = new WebSocket('ws://localhost:8000/api/alerts/ws');
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_alert') {
+            console.log('Nueva alerta:', data.alert);
+            // Mostrar notificación al usuario
+        }
+    };
+    ```
+    """
+    await manager.connect_alert_listener(websocket)
+    
+    try:
+        # Mantener la conexión abierta
+        while True:
+            # Esperar mensajes del cliente (aunque no se esperan)
+            await websocket.receive_text()
+    
+    except WebSocketDisconnect:
+        manager.disconnect_alert_listener(websocket)

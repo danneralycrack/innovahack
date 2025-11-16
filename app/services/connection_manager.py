@@ -17,6 +17,9 @@ class ConnectionManager:
         # Lista de WebSockets de admins
         self.active_admins: List[WebSocket] = []
         
+        # Lista de WebSockets escuchando alertas
+        self.alert_listeners: List[WebSocket] = []
+        
         # Diccionario: {user_id: {name, lat, lng, route_id, last_update}}
         self.tracker_locations: Dict[str, dict] = {}
     
@@ -136,6 +139,52 @@ class ConnectionManager:
     def get_active_admins_count(self) -> int:
         """Obtener cantidad de admins conectados"""
         return len(self.active_admins)
+    
+    
+    async def connect_alert_listener(self, websocket: WebSocket):
+        """Conectar un cliente que escucha alertas"""
+        await websocket.accept()
+        self.alert_listeners.append(websocket)
+        
+        await websocket.send_json({
+            "type": "connection",
+            "message": "Conectado al sistema de alertas en tiempo real",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        print(f"✅ Alert listener conectado. Total: {len(self.alert_listeners)}")
+    
+    
+    def disconnect_alert_listener(self, websocket: WebSocket):
+        """Desconectar un cliente de alertas"""
+        if websocket in self.alert_listeners:
+            self.alert_listeners.remove(websocket)
+        
+        print(f"❌ Alert listener desconectado. Total: {len(self.alert_listeners)}")
+    
+    
+    async def broadcast_alert(self, alert_data: dict):
+        """Enviar alerta a todos los clientes conectados"""
+        disconnected_listeners = []
+        
+        message = {
+            "type": "new_alert",
+            "alert": alert_data,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        for listener_ws in self.alert_listeners:
+            try:
+                await listener_ws.send_json(message)
+            except Exception as e:
+                print(f"Error enviando alerta a listener: {e}")
+                disconnected_listeners.append(listener_ws)
+        
+        # Limpiar listeners desconectados
+        for listener_ws in disconnected_listeners:
+            self.disconnect_alert_listener(listener_ws)
+        
+        print(f"📢 Alerta enviada a {len(self.alert_listeners)} clientes")
 
 
 # Instancia global del gestor

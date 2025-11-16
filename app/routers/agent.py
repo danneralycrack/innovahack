@@ -48,6 +48,7 @@ async def analyze_trash_bin_image(request: ImageAnalysisRequest, db=Depends(get_
         rutas_completadas_collection = db["rutas_completadas"]
         nuevo_documento = {
             "nombre": "Juan Agustin",
+            "ruta": "Ruta 5 - UPSA",
             "foto_base64": request.image_base64,
             "volumen_porcentual": fill_percentage,
             "timestamp": datetime.now()
@@ -108,6 +109,7 @@ async def analyze_trash_bin_file(file: UploadFile = File(...), db=Depends(get_da
         rutas_completadas_collection = db["rutas_completadas"]
         nuevo_documento = {
             "nombre": "Juan Agustin",
+            "ruta": "Ruta 5 - UPSA",
             "foto_base64": image_base64,
             "volumen_porcentual": fill_percentage,
             "timestamp": datetime.now()

@@ -131,6 +131,35 @@ async def analyze_trash_bin_file(file: UploadFile = File(...), db=Depends(get_da
         )
 
 
+@router.get("/rutas-completadas")
+async def get_rutas_completadas(db=Depends(get_database)):
+    """
+    Obtener todos los registros de rutas completadas
+    
+    Retorna la lista de análisis guardados con nombre, foto en base64 y volumen porcentual.
+    """
+    try:
+        rutas_completadas_collection = db["rutas_completadas"]
+        
+        # Obtener todos los documentos
+        rutas = await rutas_completadas_collection.find().to_list(length=None)
+        
+        # Convertir ObjectId a string
+        for ruta in rutas:
+            ruta["_id"] = str(ruta["_id"])
+        
+        return {
+            "total": len(rutas),
+            "rutas_completadas": rutas
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener rutas completadas: {str(e)}"
+        )
+
+
 @router.get("/health")
 async def agent_health_check():
     """Verificar que el agente de IA está funcionando"""

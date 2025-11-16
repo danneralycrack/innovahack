@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from app.config.database import get_database
 from app.schemas.alert import AlertCreate, AlertResponse
@@ -47,13 +47,15 @@ async def create_alert(alert: AlertCreate, db=Depends(get_database)):
         
         route_name = route.get("name", "Ruta Desconocida")
         
-        # Crear documento de alerta
+        # Crear documento de alerta con hora de Bolivia (UTC-4)
+        # Bolivia está 4 horas ATRÁS de UTC
+        bolivia_time = datetime.utcnow() - timedelta(hours=4)
         alerts_collection = db["alertas"]
         new_alert = {
             "name_user": name_user,
             "route_name": route_name,
             "message": "Se desvió de su ruta",
-            "date": datetime.now()
+            "date": bolivia_time
         }
         
         result = await alerts_collection.insert_one(new_alert)

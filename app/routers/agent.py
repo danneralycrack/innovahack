@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Depends
 from fastapi.responses import JSONResponse
-from app.schemas.agent import ImageAnalysisRequest, ImageAnalysisResponse
+from app.schemas.agent import ImageAnalysisRequest, ImageAnalysisResponse, UpdateRutaCompletadaRequest
 from app.agents.trash_vision_agent import trash_agent
 from app.config.database import get_database
 from datetime import datetime
+from bson import ObjectId
 import base64
 
 router = APIRouter(
@@ -159,6 +160,71 @@ async def get_rutas_completadas(db=Depends(get_database)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al obtener rutas completadas: {str(e)}"
+        )
+
+
+@router.patch("/rutas-completadas/{ruta_id}")
+async def update_ruta_completada(
+    ruta_id: str,
+    update_data: UpdateRutaCompletadaRequest,
+    db=Depends(get_database)
+):
+    """
+    Actualizar volumen porcentual de una ruta completada
+    
+    - **ruta_id**: ID del documento a actualizar
+    - **volumen_porcentual**: Nuevo porcentaje de llenado
+    
+    **Ejemplo:**
+    ```
+    PATCH /api/agent/rutas-completadas/691966ffab69f8db8601d70d
+    {
+      "volumen_porcentual": "85%"
+    }
+    ```
+    """
+    try:
+        rutas_completadas_collection = db["rutas_completadas"]
+        
+        # Verificar que el ID sea válido
+        if not ObjectId.is_valid(ruta_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ID de ruta inválido"
+            )
+        
+        # Actualizar documento
+        result = await rutas_completadas_collection.update_one(
+            {"_id": ObjectId(ruta_id)},
+            {
+                "$set": {
+                    "volumen_porcentual": update_data.volumen_porcentual,
+                    "updated_at": datetime.now()
+                }
+            }
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Ruta completada con ID {ruta_id} no encontrada"
+            )
+        
+        # Obtener documento actualizado
+        updated_ruta = await rutas_completadas_collection.find_one({"_id": ObjectId(ruta_id)})
+        updated_ruta["_id"] = str(updated_ruta["_id"])
+        
+        return {
+            "message": "Volumen porcentual actualizado exitosamente",
+            "ruta_completada": updated_ruta
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al actualizar ruta completada: {str(e)}"
         )
 
 

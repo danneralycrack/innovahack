@@ -27,3 +27,15 @@ class ImageAnalysisResponse(BaseModel):
                 "timestamp": "2025-11-15T10:30:00"
             }
         }
+
+
+class UpdateRutaCompletadaRequest(BaseModel):
+    """Schema para actualizar una ruta completada"""
+    volumen_porcentual: str = Field(..., description="Nuevo porcentaje de llenado (ej: 75%)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "volumen_porcentual": "85%"
+            }
+        }

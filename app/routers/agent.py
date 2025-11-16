@@ -241,7 +241,7 @@ async def agent_health_check():
         return {
             "status": "ok" if api_key_configured else "warning",
             "agent": "Trash Vision AI",
-            "model": "gemini-2.0-flash",
+            "model": "gemini-2.5-flash",
             "api_key_configured": api_key_configured,
             "message": "Agente listo para analizar imágenes" if api_key_configured else "⚠️ Configura GEMINI_API_KEY en .env"
         }
